@@ -6,6 +6,9 @@ using CredentialFlow.Application.Interfaces.Repositories;
 using CredentialFlow.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using System.Globalization;
+using CredentialFlow.Domain.Entities;
+
 
 namespace CredentialFlow.Infrastructure.Jobs;
 
@@ -65,6 +68,66 @@ public class UploadProcessor : IUploadProcessor
                 "Processing file {FileName}. Size: {FileSize} bytes",
                 fileInfo.Name,
                 fileInfo.Length);
+
+            var rows = new List<UploadRow>();
+
+            var lines = await File.ReadAllLinesAsync(
+                upload.FilePath,
+                cancellationToken);
+
+            for (int i = 1; i < lines.Length; i++)
+            {
+                var values = lines[i].Split(',');
+
+                if (values.Length < 5)
+                {
+                    continue;
+                }
+
+                var uploadRow = new UploadRow
+                {
+                    Id = Guid.NewGuid(),
+                    UploadId = upload.Id,
+                    RowNumber = i + 1,
+                    FirstName = values[0],
+                    LastName = values[1],
+                    Email = values[2],
+                    CourseName = values[3],
+                    Status = UploadRowStatus.Valid
+                };
+
+                if (DateTime.TryParse(
+                    values[4],
+                    out var completionDate))
+                {
+                    uploadRow.CompletionDate = completionDate;
+                }
+                else
+                {
+                    uploadRow.Status = UploadRowStatus.Invalid;
+                    uploadRow.ErrorMessage =
+                        "Invalid completion date";
+                }
+
+                rows.Add(uploadRow);
+            }
+
+            await _uploadRepository.AddRowsAsync(
+                rows,
+                cancellationToken);
+
+            await _uploadRepository.SaveChangesAsync(
+                cancellationToken);
+
+            upload.TotalRows = rows.Count;
+
+            upload.SuccessfulRows =
+                rows.Count(x =>
+                    x.Status != UploadRowStatus.Invalid);
+
+            upload.FailedRows =
+                rows.Count(x =>
+                    x.Status == UploadRowStatus.Invalid);
 
             upload.Status = UploadStatus.Completed;
 

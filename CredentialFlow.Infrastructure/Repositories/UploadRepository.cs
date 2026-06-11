@@ -21,8 +21,7 @@ public class UploadRepository : IUploadRepository
         cancellationToken);
     }
 
-    public async Task<Upload?> GetByIdAsync(Guid id,
-    CancellationToken cancellationToken)
+    public async Task<Upload?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.Uploads
             .FirstOrDefaultAsync(
@@ -30,12 +29,26 @@ public class UploadRepository : IUploadRepository
                 cancellationToken);
     }
 
-    public Task UpdateAsync(Upload upload,
-        CancellationToken cancellationToken)
+    public Task UpdateAsync(Upload upload, CancellationToken cancellationToken)
     {
         _dbContext.Uploads.Update(upload);
 
         return Task.CompletedTask;
+    }
+
+    public async Task AddRowsAsync(IEnumerable<UploadRow> rows, CancellationToken cancellationToken)
+    {
+        await _dbContext.UploadRows.AddRangeAsync(
+            rows,
+            cancellationToken);
+    }
+
+    public async Task<int> GetRowCountAsync(Guid uploadId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.UploadRows
+            .CountAsync(
+                x => x.UploadId == uploadId,
+                cancellationToken);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)

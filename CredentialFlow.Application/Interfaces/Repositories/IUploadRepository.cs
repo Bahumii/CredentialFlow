@@ -16,6 +16,12 @@ public interface IUploadRepository
     Task UpdateAsync(Upload upload,
     CancellationToken cancellationToken);
 
+    Task AddRowsAsync(IEnumerable<UploadRow> rows,
+    CancellationToken cancellationToken);
+
+    Task<int> GetRowCountAsync(Guid uploadId,
+        CancellationToken cancellationToken);
+
     Task SaveChangesAsync(
     CancellationToken cancellationToken);
 }
