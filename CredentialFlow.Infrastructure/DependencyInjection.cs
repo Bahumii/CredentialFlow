@@ -12,8 +12,9 @@ public static class DependencyInjection
     this IServiceCollection services)
     {
         services.AddScoped<IUploadRepository, UploadRepository>();
-
         services.AddScoped<IUploadProcessor, UploadProcessor>();
+        services.AddScoped<ICertificateRepository, CertificateRepository>();
+        services.AddScoped<ILearnerRepository, LearnerRepository>();
 
         return services;
     }

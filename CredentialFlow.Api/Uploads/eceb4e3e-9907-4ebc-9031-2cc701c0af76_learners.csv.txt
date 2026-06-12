@@ -1,0 +1,4 @@
+FirstName,LastName,Email,CourseName,CompletionDate
+John,Smith,john@test.com,First Aid,2025-01-01
+Jane,Doe,jane@test.com,Fire Safety,2025-02-15
+Bad,User,bad@test.com,CPR,NOT_A_DATE

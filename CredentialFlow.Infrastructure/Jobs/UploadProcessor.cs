@@ -16,13 +16,16 @@ public class UploadProcessor : IUploadProcessor
 {
     private readonly IUploadRepository _uploadRepository;
     private readonly ILogger<UploadProcessor> _logger;
+    private readonly ILearnerRepository _learnerRepository;
+    private readonly ICertificateRepository _certificateRepository;
 
-    public UploadProcessor(
-        IUploadRepository uploadRepository,
-        ILogger<UploadProcessor> logger)
+    public UploadProcessor(IUploadRepository uploadRepository,ILogger<UploadProcessor> logger,         
+        ILearnerRepository learnerRepository, ICertificateRepository certificateRepository)
     {
         _uploadRepository = uploadRepository;
         _logger = logger;
+        _learnerRepository = learnerRepository;
+        _certificateRepository = certificateRepository;
     }
 
     public async Task ProcessUploadAsync(
@@ -118,6 +121,94 @@ public class UploadProcessor : IUploadProcessor
 
             await _uploadRepository.SaveChangesAsync(
                 cancellationToken);
+
+            foreach (var row in rows.Where(x =>
+             x.Status == UploadRowStatus.Valid))
+            {
+                var learner =
+                    await _learnerRepository.GetByEmailAsync(
+                        row.Email,
+                        cancellationToken);
+
+                if (learner == null)
+                {
+                    learner = new Learner
+                    {
+                        Id = Guid.NewGuid(),
+                        FirstName = row.FirstName,
+                        LastName = row.LastName,
+                        Email = row.Email,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _learnerRepository.AddAsync(
+                        learner,
+                        cancellationToken);
+
+                    await _uploadRepository.SaveChangesAsync(
+                        cancellationToken);
+
+                    _logger.LogInformation(
+                        "Created learner {Email}",
+                        learner.Email);
+                }
+
+                //var certificate = new Certificate
+                //{
+                //    Id = Guid.NewGuid(),
+                //    LearnerId = learner.Id,
+                //    CourseName = row.CourseName,
+                //    CompletionDate = row.CompletionDate,
+                //    IssuedAt = DateTime.UtcNow,
+                //    CertificateNumber =
+                //        $"CERT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8]}"
+                //};
+
+                var certificateExists =
+                    await _certificateRepository.ExistsAsync(
+                        learner.Id,
+                        row.CourseName,
+                        cancellationToken);
+
+                if (!certificateExists)
+                {
+                    var certificate = new Certificate
+                    {
+                        Id = Guid.NewGuid(),
+                        LearnerId = learner.Id,
+                        CourseName = row.CourseName,
+                        CompletionDate = row.CompletionDate,
+                        IssuedAt = DateTime.UtcNow,
+                        CertificateNumber =
+                            $"CERT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8]}"
+                    };
+
+                    await _certificateRepository.AddAsync(
+                        certificate,
+                        cancellationToken);
+
+                    _logger.LogInformation(
+                        "Certificate created for {Email}",
+                        learner.Email);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Duplicate certificate prevented for {Email}",
+                        learner.Email);
+                }
+
+                //row.Status = UploadRowStatus.Processed;
+
+                //await _certificateRepository.AddAsync(
+                //    certificate,
+                //    cancellationToken);
+
+                row.Status = UploadRowStatus.Processed;
+            }
+
+            await _uploadRepository.SaveChangesAsync(
+                    cancellationToken);
 
             upload.TotalRows = rows.Count;
 

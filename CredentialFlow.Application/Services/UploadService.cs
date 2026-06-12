@@ -6,6 +6,7 @@ using CredentialFlow.Domain.Enums;
 using CredentialFlow.Application.Interfaces.Jobs;
 using Hangfire;
 using System.IO;
+using FluentValidation;
 
 namespace CredentialFlow.Application.Services;
 
@@ -13,19 +14,24 @@ public class UploadService : IUploadService
 {
     private readonly IUploadRepository _uploadRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IValidator<UploadFileRequestDto> _validator;
 
-    public UploadService(IUploadRepository uploadRepository, IBackgroundJobClient backgroundJobClient)
+    public UploadService(IUploadRepository uploadRepository, IBackgroundJobClient backgroundJobClient, IValidator<UploadFileRequestDto> validator)
     {
         _uploadRepository = uploadRepository;
         _backgroundJobClient = backgroundJobClient;
+        _validator = validator;
     }
 
     public async Task<UploadResponseDto> UploadAsync(UploadFileRequestDto request,
         CancellationToken cancellationToken)
     {
+        await _validator.ValidateAndThrowAsync(request,
+        cancellationToken);
+
         var uploadsFolder = Path.Combine(
-    Directory.GetCurrentDirectory(),
-    "Uploads");
+            Directory.GetCurrentDirectory(),
+            "Uploads");
 
         Directory.CreateDirectory(uploadsFolder);
 
