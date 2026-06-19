@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System.IO;
 using System.Globalization;
 using CredentialFlow.Domain.Entities;
+using CredentialFlow.Application.Interfaces.Services;
 
 
 namespace CredentialFlow.Infrastructure.Jobs;
@@ -18,14 +19,16 @@ public class UploadProcessor : IUploadProcessor
     private readonly ILogger<UploadProcessor> _logger;
     private readonly ILearnerRepository _learnerRepository;
     private readonly ICertificateRepository _certificateRepository;
+    private readonly IPdfGenerator _pdfGenerator;
 
     public UploadProcessor(IUploadRepository uploadRepository,ILogger<UploadProcessor> logger,         
-        ILearnerRepository learnerRepository, ICertificateRepository certificateRepository)
+        ILearnerRepository learnerRepository, ICertificateRepository certificateRepository, IPdfGenerator pdfGenerator)
     {
         _uploadRepository = uploadRepository;
         _logger = logger;
         _learnerRepository = learnerRepository;
         _certificateRepository = certificateRepository;
+        _pdfGenerator = pdfGenerator;
     }
 
     public async Task ProcessUploadAsync(
@@ -172,6 +175,18 @@ public class UploadProcessor : IUploadProcessor
 
                 if (!certificateExists)
                 {
+                    // Generate unique certificate number.
+                    var certificateNumber =
+                        $"CERT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8]}";
+
+                    // Generate PDF document.
+                    var pdfPath =
+                        await _pdfGenerator.GenerateCertificateAsync(
+                            $"{learner.FirstName} {learner.LastName}",
+                            row.CourseName,
+                            certificateNumber,
+                            cancellationToken);
+
                     var certificate = new Certificate
                     {
                         Id = Guid.NewGuid(),
@@ -179,8 +194,8 @@ public class UploadProcessor : IUploadProcessor
                         CourseName = row.CourseName,
                         CompletionDate = row.CompletionDate,
                         IssuedAt = DateTime.UtcNow,
-                        CertificateNumber =
-                            $"CERT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8]}"
+                        CertificateNumber = certificateNumber,
+                        PdfPath = pdfPath
                     };
 
                     await _certificateRepository.AddAsync(
@@ -188,8 +203,9 @@ public class UploadProcessor : IUploadProcessor
                         cancellationToken);
 
                     _logger.LogInformation(
-                        "Certificate created for {Email}",
-                        learner.Email);
+                        "Certificate created for {Email}. PDF: {PdfPath}",
+                        learner.Email,
+                        pdfPath);
                 }
                 else
                 {
@@ -197,12 +213,6 @@ public class UploadProcessor : IUploadProcessor
                         "Duplicate certificate prevented for {Email}",
                         learner.Email);
                 }
-
-                //row.Status = UploadRowStatus.Processed;
-
-                //await _certificateRepository.AddAsync(
-                //    certificate,
-                //    cancellationToken);
 
                 row.Status = UploadRowStatus.Processed;
             }

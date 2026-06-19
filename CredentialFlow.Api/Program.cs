@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Hangfire;
 using Hangfire.SqlServer;
+using QuestPDF;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,8 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
 
